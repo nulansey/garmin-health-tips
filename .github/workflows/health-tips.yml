@@ -1,0 +1,51 @@
+name: Health tips
+
+on:
+  schedule:
+    # Cron times are UTC. These are 7:00, 13:00, 20:00 in Pacific/Honolulu
+    # (UTC-10, no DST). If config.yaml's timezone changes, update these.
+    - cron: "0 17 * * *"   # 07:00 HST — morning briefing
+    - cron: "0 23 * * *"   # 13:00 HST — midday tip
+    - cron: "0 6 * * *"    # 20:00 HST — evening tip
+  workflow_dispatch:        # allows manual test runs from the Actions tab
+
+permissions:
+  contents: write           # to commit history/tips.json back
+
+concurrency:
+  group: health-tips
+  cancel-in-progress: false
+
+jobs:
+  send-tip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore Garmin auth tokens
+        env:
+          GARMIN_TOKENS_B64: ${{ secrets.GARMIN_TOKENS_B64 }}
+        run: echo "$GARMIN_TOKENS_B64" | base64 -d | tar -xzf - -C ~
+
+      - name: Send tip
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python -m src.main
+
+      - name: Save tip history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add history/tips.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Record sent tip"
+          git pull --rebase
+          git push
