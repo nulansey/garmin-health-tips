@@ -1,0 +1,6 @@
+garminconnect>=0.3.6
+curl_cffi
+anthropic
+requests
+PyYAML
+pytest

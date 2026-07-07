@@ -1,0 +1,8 @@
+# User-editable settings. No secrets in this file.
+timezone: Pacific/Honolulu   # IANA timezone; if you change it, also update the
+                             # cron times in .github/workflows/health-tips.yml
+goal:
+  type: deficit              # deficit | maintain | surplus
+  amount: 500                # calories below/above yesterday's burn (ignored for maintain)
+tone: friendly and encouraging, like a knowledgeable coach who keeps it brief
+history_days: 14             # how many days of past tips to remember
