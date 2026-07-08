@@ -29,11 +29,6 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Restore Garmin auth tokens
-        env:
-          GARMIN_TOKENS_B64: ${{ secrets.GARMIN_TOKENS_B64 }}
-        run: echo "$GARMIN_TOKENS_B64" | base64 -d | tar -xzf - -C ~
-
       - name: Send tip
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
