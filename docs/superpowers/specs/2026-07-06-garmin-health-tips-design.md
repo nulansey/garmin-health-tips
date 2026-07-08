@@ -1,7 +1,36 @@
 # Garmin Health Tips — Design
 
-**Date:** 2026-07-06
-**Status:** Approved by user (brainstorming session)
+**Date:** 2026-07-06 (v2 revision 2026-07-07)
+**Status:** Approved by user (brainstorming session; v2 restructure approved 2026-07-07)
+
+## v2 revision (2026-07-07) — predictive tips with manual fetches
+
+Approved by the user after Garmin's login rate-limiting made daily automated
+fetching unreliable, and because they prefer pattern-based tips. Supersedes the
+per-run live fetch described below; everything not mentioned here is unchanged
+(3 daily slots, ntfy, tip memory, duplicate protection, configurable goal,
+error notifications).
+
+- **Data store:** `data/daily.json` — `{ "YYYY-MM-DD": {curated metrics} }`,
+  committed to the repo, grows forever.
+- **Fetching is manual and local** (weekly or twice-weekly, run by Claude on
+  request via a `/fetch-garmin` project skill): `python -m src.fetch` logs in
+  with saved tokens, backfills 90 days on first run, then fetches since the
+  newest stored day, merges, and the skill commits/pushes. Garmin credentials
+  never go to GitHub — Actions secrets shrink to `ANTHROPIC_API_KEY` and
+  `NTFY_TOPIC`. Browser-assisted export is the documented fallback if token
+  login stays broken.
+- **Tips become predictive:** stats are exponentially weighted (EWMA) so ALL
+  history counts but recent days count more — `half_life_days: 45` in
+  config.yaml (a 45-day-old data point has half the weight of today's).
+  Morning calorie target = weekday EWMA of total burn (>= 4 observations of
+  that weekday required, else overall EWMA). The prompt gets: per-weekday
+  weighted stats with observation counts, the last 14 raw days, the last 4
+  same-weekdays, and today's date — Claude contextualizes trends, holidays,
+  and habit changes rather than a formula modeling them.
+- **Staleness guard:** `stale_after_days: 10` in config.yaml. When the newest
+  stored day is older than that, the morning run sends a "time for a Garmin
+  fetch" nudge instead of a tip; midday/evening runs exit silently.
 
 ## What this is
 
