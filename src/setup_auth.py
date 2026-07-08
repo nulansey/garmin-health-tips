@@ -29,6 +29,10 @@ def main():
             "without a code): "
         ).strip(),
     )
+    # The mobile endpoints 429 aggressively and every hit counts as another
+    # failed login, extending Garmin's account throttle — go straight to the
+    # widget flow, which matches the normal browser login.
+    api.client.skip_strategies = {"mobile+cffi", "mobile+requests"}
     api.login(tokenstore)
     print(f"\nLogin OK. Tokens saved to {tokenstore}")
 
