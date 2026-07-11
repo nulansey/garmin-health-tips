@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Garmin Health Coach{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">🏃 Coach</span>
+    <a href="/">Dashboard</a>
+    <a href="/goals">Goals</a>
+    <a href="/chat">Chat</a>
+  </nav>
+  {% if flash %}
+  <div class="flash {{ 'ok' if flash.ok else 'err' }}">{{ flash.text }}</div>
+  {% endif %}
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>
