@@ -49,13 +49,21 @@ def calorie_target(yesterday_burn, goal_type, amount):
     return int(round(target / 50.0) * 50)
 
 
-def determine_slot(local_hour):
-    """Map the local hour to a notification slot."""
-    if local_hour < 11:
-        return "morning"
-    if local_hour < 17:
-        return "midday"
-    return "evening"
+def determine_slot(local_hour, slots=None):
+    """The enabled slot whose configured hour is nearest to the local hour.
+
+    Ties break toward the earlier slot; None when no slot is enabled.
+    """
+    slots = slots if slots is not None else DEFAULT_SLOTS
+    best = None
+    for name in ("morning", "midday", "evening"):
+        s = slots.get(name, {})
+        if not s.get("enabled"):
+            continue
+        dist = abs(local_hour - s["hour"])
+        if best is None or dist < best[0]:
+            best = (dist, name)
+    return best[1] if best else None
 
 
 def load_history(path=HISTORY_PATH):
@@ -90,7 +98,11 @@ def run(args):
     now = datetime.now(ZoneInfo(config["timezone"]))
     today = now.date()
     today_iso = today.isoformat()
-    slot = args.slot or determine_slot(now.hour)
+    slots = get_slots(config)
+    slot = args.slot or determine_slot(now.hour, slots)
+    if slot is None or not slots.get(slot, {}).get("enabled", True):
+        print(f"slot {slot!r} is disabled; exiting.")
+        return
 
     history = load_history()
     if not args.dry_run and already_sent(history, today_iso, slot):

@@ -32,3 +32,25 @@ def test_append_tip_prunes_entries_older_than_keep_days():
     history = [{"date": "2026-06-01", "slot": "morning", "text": "old"}]
     out = append_tip(history, "2026-07-06", "morning", "new", keep_days=14)
     assert [t["text"] for t in out] == ["new"]
+
+
+def test_determine_slot_defaults_backcompat():
+    # nearest-hour logic must agree with the old fixed windows for defaults
+    assert determine_slot(8) == "morning"
+    assert determine_slot(12) == "midday"
+    assert determine_slot(19) == "evening"
+
+
+def test_determine_slot_custom_hours():
+    slots = {"morning": {"enabled": True, "hour": 9},
+             "midday": {"enabled": False, "hour": 13},
+             "evening": {"enabled": True, "hour": 21}}
+    assert determine_slot(9, slots) == "morning"
+    assert determine_slot(14, slots) == "morning"   # midday disabled; 9 is nearer than 21
+    assert determine_slot(20, slots) == "evening"
+
+
+def test_determine_slot_none_enabled():
+    slots = {k: {"enabled": False, "hour": h}
+             for k, h in [("morning", 7), ("midday", 13), ("evening", 20)]}
+    assert determine_slot(10, slots) is None
