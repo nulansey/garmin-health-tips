@@ -51,3 +51,34 @@ Timezone (update the workflow's UTC cron lines if you change it), calorie goal
 You get a single "Health tips problem" notification and the run shows red in
 the Actions tab with a full log. Garmin login troubleshooting lives in
 `.claude/skills/fetch-garmin/SKILL.md`.
+
+## Web control panel (v2)
+
+A local web app for the dashboard, goal editing, and a chat coach.
+
+### Run it
+
+    ./coach
+
+Then open http://localhost:8787 on the Mac, or http://<mac-name>.local:8787
+from your phone on the same WiFi (find the name in System Settings → General
+→ Sharing → Local hostname).
+
+Requirements: `.venv/bin/pip install -r requirements-web.txt` once, and a
+`.env` file at the repo root containing `GEMINI_API_KEY=...` (never commit it).
+
+### Phone access from anywhere (optional)
+
+Install Tailscale (free for personal use) on both the Mac and the phone, sign
+into the same account, then use the Mac's Tailscale hostname instead of
+`<mac-name>.local`. No app changes needed.
+
+**Do not** port-forward 8787 on your router — the app has no login and your
+health data would be public.
+
+### How goal saves work
+
+Saving in the UI writes `config.yaml` (and the workflow schedule for timing
+changes), then commits and pushes to GitHub. The scheduled runs pick the
+change up on the next tip. Note: the first save rewrites `config.yaml`
+without its explanatory comments — the UI is the primary editor from then on.
