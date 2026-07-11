@@ -2,6 +2,10 @@
 {% block content %}
 <h1>Garmin Health Coach</h1>
 
+<form method="post" action="/refresh" style="background:none;box-shadow:none;padding:0">
+  <button type="submit">↻ Pull latest tips</button>
+</form>
+
 {% if d.stale %}
 <div class="banner warn">
   {% if d.age_days is none %}No Garmin data yet — run <code>/fetch-garmin</code> in Claude Code.
