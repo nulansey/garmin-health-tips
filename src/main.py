@@ -13,6 +13,21 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
 HISTORY_PATH = ROOT / "history" / "tips.json"
 
+DEFAULT_SLOTS = {
+    "morning": {"enabled": True, "hour": 7},
+    "midday": {"enabled": True, "hour": 13},
+    "evening": {"enabled": True, "hour": 20},
+}
+
+
+def get_slots(config):
+    """Slots from config merged over defaults; absent section = defaults."""
+    slots = {k: dict(v) for k, v in DEFAULT_SLOTS.items()}
+    for name, override in (config.get("slots") or {}).items():
+        if name in slots:
+            slots[name].update(override)
+    return slots
+
 
 def load_config(path=CONFIG_PATH):
     with open(path) as f:
