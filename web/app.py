@@ -51,10 +51,11 @@ def dashboard_page(request: Request):
     flash = _flash(request)
     try:
         store = load_store()
-    except Exception:  # malformed data/daily.json — show the page, not a 500
+    except Exception:  # Supabase unreachable/misconfigured — show the page, not a 500
         store = {}
         flash = flash or {"ok": False,
-                          "text": "data/daily.json is unreadable — re-run /fetch-garmin"}
+                          "text": "Garmin data is unavailable — check Supabase "
+                                  "credentials or re-run the fetch"}
     d = build_dashboard(store, config, load_history(), today)
     return templates.TemplateResponse(request, "dashboard.html",
                                       {"d": d, "flash": flash})
@@ -151,7 +152,10 @@ def chat_page(request: Request):
 def chat_send(body: ChatMessage):
     config = load_config()
     now = datetime.now(ZoneInfo(config["timezone"]))
-    store = load_store()
+    try:
+        store = load_store()
+    except Exception:  # Supabase unreachable/misconfigured
+        store = {}
     half_life = config.get("half_life_days", 45)
     context = (patterns.pattern_summary(store, now.date(), half_life)
                if store else {"note": "no Garmin data in the store yet"})

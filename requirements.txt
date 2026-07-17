@@ -3,4 +3,5 @@ curl_cffi
 google-genai
 requests
 PyYAML
+supabase
 pytest
