@@ -27,11 +27,11 @@ jobs:
       # logins every 30 min would look like credential stuffing and risk an
       # account throttle (see src/setup_auth.py). If this starts failing,
       # re-run `.venv/bin/python -m src.setup_auth` locally and update the
-      # GARMIN_TOKENS_B64 secret.
+      # GARMIN_TOKEN_B64 secret.
       - name: Restore Garmin tokens
         run: |
           mkdir -p ~
-          echo "${{ secrets.GARMIN_TOKENS_B64 }}" | base64 -d | tar -xzf - -C ~
+          echo "${{ secrets.GARMIN_TOKEN_B64 }}" | base64 -d | tar -xzf - -C ~
 
       - name: Fetch Garmin data into Supabase
         env:

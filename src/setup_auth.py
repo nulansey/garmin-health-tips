@@ -3,7 +3,7 @@
 Run locally:  .venv/bin/python -m src.setup_auth
 
 Saves reusable auth tokens to ~/.garminconnect (or $GARMINTOKENS) and prints a
-base64 blob to paste into the GitHub Actions secret GARMIN_TOKENS_B64.
+base64 blob to paste into the GitHub Actions secret GARMIN_TOKEN_B64.
 Tokens last roughly a year; re-run this when they expire.
 """
 import base64
@@ -40,7 +40,7 @@ def main():
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         tar.add(Path(tokenstore).expanduser(), arcname=".garminconnect")
     blob = base64.b64encode(buf.getvalue()).decode()
-    print("\nPaste this whole line as the GitHub secret GARMIN_TOKENS_B64:\n")
+    print("\nPaste this whole line as the GitHub secret GARMIN_TOKEN_B64:\n")
     print(blob)
 
 

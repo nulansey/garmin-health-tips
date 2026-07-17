@@ -44,9 +44,23 @@ def get_client():
     return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"])
 
 
+NON_INT_COLUMNS = {"distance_m", "activities", "hrv_status"}
+
+
 def to_row(day_iso, record):
-    """A garmin.fetch_day() record -> a daily_metrics row ready to upsert."""
-    row = {FIELD_MAP[k]: v for k, v in record.items() if k in FIELD_MAP}
+    """A garmin.fetch_day() record -> a daily_metrics row ready to upsert.
+
+    Garmin sometimes returns whole-number fields as floats (e.g. 2543.0);
+    Postgres integer columns reject the decimal point, so round those here.
+    """
+    row = {}
+    for k, v in record.items():
+        if k not in FIELD_MAP:
+            continue
+        col = FIELD_MAP[k]
+        if isinstance(v, float) and col not in NON_INT_COLUMNS:
+            v = round(v)
+        row[col] = v
     row["date"] = day_iso
     row["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     return row

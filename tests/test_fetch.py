@@ -65,6 +65,16 @@ def test_to_row_maps_fields_and_stamps_date():
     assert "updated_at" in row
 
 
+def test_to_row_rounds_float_ints_but_keeps_distance_float():
+    row = to_row("2026-07-01", {
+        "totalKilocalories": 2543.0,
+        "totalDistanceMeters": 4821.7,
+    })
+    assert row["total_kcal"] == 2543
+    assert isinstance(row["total_kcal"], int)
+    assert row["distance_m"] == 4821.7
+
+
 def test_to_row_ignores_unmapped_keys():
     row = to_row("2026-07-01", {"unknownField": 1})
     assert "unknownField" not in row
