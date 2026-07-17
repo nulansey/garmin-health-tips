@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
+import WeightForm from "../components/WeightForm.jsx";
+import WeightTrendChart from "../components/WeightTrendChart.jsx";
 
 function hoursMinutes(seconds) {
   if (seconds == null) return "—";
@@ -11,6 +13,7 @@ function hoursMinutes(seconds) {
 export default function Dashboard() {
   const [days, setDays] = useState(null); // null = loading, [] = loaded empty
   const [error, setError] = useState(false);
+  const [weights, setWeights] = useState(null);
 
   async function load() {
     setError(false);
@@ -24,8 +27,17 @@ export default function Dashboard() {
     else setDays(data);
   }
 
+  async function loadWeights() {
+    const { data } = await supabase
+      .from("weights")
+      .select("id, measured_at, weight")
+      .order("measured_at", { ascending: true });
+    setWeights(data ?? []);
+  }
+
   useEffect(() => {
     load();
+    loadWeights();
   }, []);
 
   if (error)
@@ -60,6 +72,10 @@ export default function Dashboard() {
           </li>
         ))}
       </ul>
+
+      <h2>Weight</h2>
+      <WeightForm onSaved={loadWeights} />
+      {weights === null ? <p>Loading weight…</p> : <WeightTrendChart weights={weights} />}
     </section>
   );
 }
