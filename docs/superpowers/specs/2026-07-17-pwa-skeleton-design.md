@@ -23,7 +23,7 @@ A phone-installable Progressive Web App that, for the owner only:
 - No meals, no calorie balance view (needs the `meals` table — phase 4). Showing
   burn without intake would imply a balance that does not yet exist.
 - No photo/vision flow (phase 5).
-- No goal-editing UI — goal weight is a hardcoded constant this phase.
+- No goal-editing UI — goal weight is a hardcoded constant this phase (155 lbs).
 - No changes to `src/` (Python fetch/tips) or `web/` (the existing FastAPI
   panel). The FastAPI panel keeps running; the PWA replaces it in a later phase.
 - No changes to `src/garmin.py` — weight is entered manually, not fetched.
@@ -98,7 +98,8 @@ updates. No optimistic UI, no offline queue (owner is on wifi at weigh-in).
 
 - **Weight trend chart:** 7-day rolling average as the primary line, raw
   weigh-ins as faint dots, goal weight as a horizontal reference line
-  (`plan.md` decision #5). Goal weight is a hardcoded constant this phase.
+  (`plan.md` decision #5). Goal weight is a hardcoded constant this phase:
+  **155 lbs**. Weight is entered and displayed in pounds.
 - **Garmin daily numbers** from `daily_metrics`: steps, resting HR, sleep,
   body battery, and today's calories-burned labeled in-progress (`plan.md` #7).
 - **No calorie balance** (needs meals — phase 4).
