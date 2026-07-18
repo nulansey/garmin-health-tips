@@ -67,6 +67,31 @@ async function estimate(imageB64: string) {
   return json(JSON.parse(textBlock.text));
 }
 
+const DAILY_PHOTO_CAP = 20;
+
+function honoluluDate(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Pacific/Honolulu",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now); // en-CA yields YYYY-MM-DD
+}
+
+async function underCap(authHeader: string | null): Promise<boolean> {
+  if (!authHeader) return false;
+  const client = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const start = honoluluDate() + "T00:00:00-10:00";
+  const { count } = await client
+    .from("meals")
+    .select("id", { count: "exact", head: true })
+    .eq("source", "photo")
+    .gte("created_at", start);
+  return (count ?? 0) < DAILY_PHOTO_CAP;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") {
@@ -76,6 +101,9 @@ Deno.serve(async (req) => {
     const { image } = await req.json();
     if (!image || typeof image !== "string") {
       return json({ error: "missing image" }, 400);
+    }
+    if (!(await underCap(req.headers.get("Authorization")))) {
+      return json({ error: "daily photo limit reached" }, 429);
     }
     return await estimate(image);
   } catch {
