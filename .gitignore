@@ -7,3 +7,4 @@ history/chat.json
 pwa/node_modules/
 pwa/dist/
 pwa/.env.local
+pwa/supabase/.temp/
