@@ -6,6 +6,8 @@ import MealForm from "../components/MealForm.jsx";
 import PhotoMealForm from "../components/PhotoMealForm.jsx";
 import { intakeDate } from "../lib/intakeDate.js";
 import { dayIntake, sevenDayBalance } from "../lib/balance.js";
+import { calibrationFactor } from "../lib/calibration.js";
+import { isLowLog } from "../lib/lowLog.js";
 
 function hoursMinutes(seconds) {
   if (seconds == null) return "—";
@@ -112,12 +114,28 @@ export default function Dashboard() {
                   <span>Calories out (in progress)</span><strong>{burnToday ?? "—"}</strong>
                 </li>
                 <li style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span>Balance</span><strong>{burnToday == null ? "—" : burnToday - inToday}</strong>
+                  <span>Balance{isLowLog(meals, todayBucket) ? " ⚠️ (low log — not reliable)" : ""}</span>
+                  <strong>{burnToday == null ? "—" : burnToday - inToday}</strong>
                 </li>
                 <li style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", color: "#64748b" }}>
                   <span>7-day balance</span><strong>{weekBalance}</strong>
                 </li>
               </ul>
+              {(() => {
+                const cal = calibrationFactor({
+                  days, meals, weights: weights ?? [], endDate: todayBucket,
+                });
+                if (!cal) return <p style={{ color: "#64748b" }}>Calibration: need ~3 weeks of logs and weigh-ins.</p>;
+                const pct = Math.round((cal.factor - 1) * 100);
+                return (
+                  <p style={{ color: "#64748b" }}>
+                    Calibration ({cal.usableDays} usable days): scale shows {cal.actualLb.toFixed(1)} lb vs {cal.predictedLb.toFixed(1)} lb predicted.
+                    {pct > 0
+                      ? ` You likely eat ~${pct}% more than you log.`
+                      : ` Your logs track the scale closely.`}
+                  </p>
+                );
+              })()}
               <MealForm onSaved={loadMeals} />
               <PhotoMealForm onSaved={loadMeals} />
               <ul style={{ listStyle: "none", padding: 0 }}>
