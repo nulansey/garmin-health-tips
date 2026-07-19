@@ -27,7 +27,7 @@ export default function App() {
   if (view === "settings") return <Settings onDone={() => setView("dashboard")} />;
 
   return (
-    <div style={{ maxWidth: 480, margin: "2rem auto", padding: "0 1rem" }}>
+    <div style={{ maxWidth: 720, margin: "2rem auto", padding: "0 1rem" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Calories</h1>
         <div>

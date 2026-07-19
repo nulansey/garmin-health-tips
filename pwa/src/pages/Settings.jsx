@@ -40,7 +40,7 @@ export default function Settings({ onDone }) {
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: "2rem auto", padding: "0 1rem" }}>
+    <div style={{ maxWidth: 720, margin: "2rem auto", padding: "0 1rem" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Settings</h1>
         <button onClick={onDone} style={button}>Back</button>

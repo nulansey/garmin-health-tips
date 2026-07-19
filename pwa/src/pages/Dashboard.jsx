@@ -8,13 +8,22 @@ import { intakeDate } from "../lib/intakeDate.js";
 import { dayIntake, sevenDayBalance, deficitState } from "../lib/balance.js";
 import { calibrationFactor } from "../lib/calibration.js";
 import { isLowLog } from "../lib/lowLog.js";
-import { card, badge, textSecondary, textMuted } from "../styles/ui.js";
+import { card, badge, button, textSecondary, textMuted } from "../styles/ui.js";
 
 function hoursMinutes(seconds) {
   if (seconds == null) return "—";
   const h = Math.floor(seconds / 3600);
   const m = Math.round((seconds % 3600) / 60);
   return `${h}h ${m}m`;
+}
+
+function StatTile({ label, value }) {
+  return (
+    <div style={{ ...card, padding: 12 }}>
+      <div style={{ ...textSecondary, fontSize: 13 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: "var(--font-weight-emphasis)" }}>{value}</div>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -84,88 +93,75 @@ export default function Dashboard() {
   if (days.length === 0) return <p>No Garmin data yet.</p>;
 
   const today = days[0]; // newest first
-  const stats = [
-    ["Calories burned (in progress)", today.total_kcal ?? "—"],
+  const todayBucket = intakeDate();
+  const burnToday = today.total_kcal; // may be null - Garmin hasn't synced yet
+  const inToday = meals ? dayIntake(meals, todayBucket) : null;
+  const balanceToday = burnToday == null || inToday == null ? null : burnToday - inToday;
+  const state = balanceToday == null || goal == null ? null : deficitState(balanceToday, goal.goal_type, goal.goal_amount);
+  const weekBalance = meals ? sevenDayBalance(days, meals, todayBucket) : null;
+  const todayMeals = meals ? meals.filter((m) => m.intake_date === todayBucket) : [];
+  const lowLog = meals ? isLowLog(meals, todayBucket) : false;
+
+  const tiles = [
+    ["Calories in", meals === null ? "—" : inToday],
+    ["Calories out", burnToday ?? "—"],
     ["Steps", today.steps ?? "—"],
     ["Resting HR", today.resting_hr ?? "—"],
     ["Sleep", hoursMinutes(today.sleep_seconds)],
     ["Sleep score", today.sleep_score ?? "—"],
     ["Body battery high", today.body_battery_high ?? "—"],
     ["Body battery low", today.body_battery_low ?? "—"],
+    ["7-day balance", weekBalance ?? "—"],
   ];
 
   return (
     <section>
-      <h2>Today ({today.date})</h2>
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {stats.map(([label, value]) => (
-          <li key={label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-            <span style={textSecondary}>{label}</span>
-            <strong>{value}</strong>
-          </li>
-        ))}
-      </ul>
+      <div style={{ ...card, ...(state ? badge[state] : {}), padding: 20, marginBottom: 20 }}>
+        <div style={{ ...textSecondary, fontSize: 14 }}>
+          Today's balance{lowLog ? " — low log, not reliable" : ""}
+        </div>
+        <div style={{ fontSize: 48, fontWeight: "var(--font-weight-emphasis)", lineHeight: 1.1 }}>
+          {balanceToday == null ? "—" : balanceToday}
+        </div>
+      </div>
 
-      {meals === null || goal === null ? (
+      <h2>Today ({today.date})</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8, marginBottom: 16 }}>
+        {tiles.map(([label, value]) => (
+          <StatTile key={label} label={label} value={value} />
+        ))}
+      </div>
+
+      {meals === null ? (
         <p style={textSecondary}>Loading meals…</p>
       ) : (
-        (() => {
-          const todayBucket = intakeDate();
-          const inToday = dayIntake(meals, todayBucket);
-          const burnToday = today.total_kcal; // may be null - Garmin hasn't synced yet
-          const balanceToday = burnToday == null ? null : burnToday - inToday;
-          const state = balanceToday == null ? null : deficitState(balanceToday, goal.goal_type, goal.goal_amount);
-          const weekBalance = sevenDayBalance(days, meals, todayBucket);
-          const todayMeals = meals.filter((m) => m.intake_date === todayBucket);
-          return (
-            <div>
-              <div style={{ ...card, ...(state ? badge[state] : {}), margin: "8px 0 16px", padding: 16 }}>
-                <div style={{ ...textSecondary, fontSize: 13 }}>
-                  Today's balance{isLowLog(meals, todayBucket) ? " — low log, not reliable" : ""}
-                </div>
-                <div style={{ fontSize: 32, fontWeight: "var(--font-weight-emphasis)" }}>
-                  {balanceToday == null ? "—" : balanceToday}
-                </div>
-              </div>
-              <ul style={{ listStyle: "none", padding: 0 }}>
-                <li style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span style={textSecondary}>Calories in</span><strong>{inToday}</strong>
-                </li>
-                <li style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span style={textSecondary}>Calories out (in progress)</span><strong>{burnToday ?? "—"}</strong>
-                </li>
-                <li style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span style={textMuted}>7-day balance</span><strong style={textMuted}>{weekBalance}</strong>
-                </li>
-              </ul>
-              {(() => {
-                const cal = calibrationFactor({
-                  days, meals, weights: weights ?? [], endDate: todayBucket,
-                });
-                if (!cal) return <p style={textMuted}>Calibration: need ~3 weeks of logs and weigh-ins.</p>;
-                const pct = Math.round((cal.factor - 1) * 100);
-                return (
-                  <p style={textMuted}>
-                    Calibration ({cal.usableDays} usable days): scale shows {cal.actualLb.toFixed(1)} lb vs {cal.predictedLb.toFixed(1)} lb predicted.
-                    {pct > 0
-                      ? ` You likely eat ~${pct}% more than you log.`
-                      : ` Your logs track the scale closely.`}
-                  </p>
-                );
-              })()}
-              <MealForm onSaved={loadMeals} />
-              <PhotoMealForm onSaved={loadMeals} />
-              <ul style={{ listStyle: "none", padding: 0 }}>
-                {todayMeals.map((m) => (
-                  <li key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-                    <span>{m.name} — {m.calories}</span>
-                    <button onClick={() => deleteMeal(m.id)} style={{ ...card, padding: "2px 8px", cursor: "pointer" }}>Delete</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })()
+        <div>
+          {(() => {
+            const cal = calibrationFactor({
+              days, meals, weights: weights ?? [], endDate: todayBucket,
+            });
+            if (!cal) return <p style={textMuted}>Calibration: need ~3 weeks of logs and weigh-ins.</p>;
+            const pct = Math.round((cal.factor - 1) * 100);
+            return (
+              <p style={textMuted}>
+                Calibration ({cal.usableDays} usable days): scale shows {cal.actualLb.toFixed(1)} lb vs {cal.predictedLb.toFixed(1)} lb predicted.
+                {pct > 0
+                  ? ` You likely eat ~${pct}% more than you log.`
+                  : ` Your logs track the scale closely.`}
+              </p>
+            );
+          })()}
+          <MealForm onSaved={loadMeals} />
+          <PhotoMealForm onSaved={loadMeals} />
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {todayMeals.map((m) => (
+              <li key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                <span>{m.name} — {m.calories}</span>
+                <button onClick={() => deleteMeal(m.id)} style={{ ...button, padding: "2px 8px" }}>Delete</button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <h2>Weight</h2>
