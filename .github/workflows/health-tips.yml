@@ -9,9 +9,6 @@ on:
     - cron: "0 6 * * *"    # 20:00 HST — evening tip
   workflow_dispatch:        # allows manual test runs from the Actions tab
 
-permissions:
-  contents: write           # to commit history/tips.json back
-
 concurrency:
   group: health-tips
   cancel-in-progress: false
@@ -36,13 +33,3 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python -m src.main
-
-      - name: Save tip history
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add history/tips.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Record sent tip"
-          git pull --rebase
-          git push

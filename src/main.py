@@ -1,6 +1,5 @@
 """Orchestration and pure logic for the Garmin health tips service."""
 import argparse
-import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -11,7 +10,6 @@ from src import analyze, fetch, notify, patterns
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
-HISTORY_PATH = ROOT / "history" / "tips.json"
 
 DEFAULT_SLOTS = {
     "morning": {"enabled": True, "hour": 7},
@@ -66,10 +64,12 @@ def determine_slot(local_hour, slots=None):
     return best[1] if best else None
 
 
-def load_history(path=HISTORY_PATH):
-    if not Path(path).exists():
-        return []
-    return json.loads(Path(path).read_text() or "[]")
+def load_history(keep_days=14, client=None):
+    client = client or fetch.get_client()
+    cutoff = (date.today() - timedelta(days=keep_days)).isoformat()
+    rows = (client.table("tip_history").select("date,slot,text")
+            .gte("date", cutoff).execute().data)
+    return [{"date": r["date"], "slot": r["slot"], "text": r["text"]} for r in rows]
 
 
 def already_sent(history, day_iso, slot):
@@ -82,8 +82,10 @@ def append_tip(history, day_iso, slot, text, keep_days=14):
     return [t for t in history if t["date"] >= cutoff]
 
 
-def save_history(history, path=HISTORY_PATH):
-    Path(path).write_text(json.dumps(history, indent=2) + "\n")
+def save_history(history, client=None):
+    """Upserts the most recently appended tip (last entry) into Supabase."""
+    client = client or fetch.get_client()
+    client.table("tip_history").upsert(history[-1]).execute()
 
 
 TITLES = {
@@ -104,7 +106,7 @@ def run(args):
         print(f"slot {slot!r} is disabled; exiting.")
         return
 
-    history = load_history()
+    history = load_history(config.get("history_days", 14))
     if not args.dry_run and already_sent(history, today_iso, slot):
         print(f"{slot} tip already sent today; exiting.")
         return

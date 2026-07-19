@@ -7,3 +7,4 @@ pwa/node_modules/
 pwa/dist/
 pwa/.env.local
 pwa/supabase/.temp/
+history/tips.json
