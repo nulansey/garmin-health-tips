@@ -1,7 +1,0 @@
--r requirements.txt
-fastapi
-uvicorn
-jinja2
-python-multipart
-python-dotenv
-httpx2

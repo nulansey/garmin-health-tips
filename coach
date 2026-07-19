@@ -1,4 +1,0 @@
-#!/bin/zsh
-# Launch the Garmin health coach web app (LAN-visible on port 8787).
-cd "$(dirname "$0")"
-exec .venv/bin/python -m uvicorn web.app:app --host 0.0.0.0 --port 8787

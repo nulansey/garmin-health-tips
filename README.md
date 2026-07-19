@@ -63,35 +63,8 @@ notification; a failed **Fetch Garmin data** run does not (it just shows red
 in the Actions tab — check there if tips stop updating with fresh data).
 Garmin login troubleshooting lives in `.claude/skills/fetch-garmin/SKILL.md`.
 
-## Web control panel (v2)
+## Calorie tracker PWA
 
-A local web app for the dashboard, goal editing, and a chat coach.
-
-### Run it
-
-    ./coach
-
-Then open http://localhost:8787 on the Mac, or http://<mac-name>.local:8787
-from your phone on the same WiFi (find the name in System Settings → General
-→ Sharing → Local hostname).
-
-Requirements: `.venv/bin/pip install -r requirements-web.txt` once, and a
-`.env` file at the repo root containing `GEMINI_API_KEY=...`, `SUPABASE_URL=...`,
-and `SUPABASE_SECRET_KEY=...` (never commit it — the dashboard and chat read
-Garmin history from Supabase, same as the workflows).
-
-### Phone access from anywhere (optional)
-
-Install Tailscale (free for personal use) on both the Mac and the phone, sign
-into the same account, then use the Mac's Tailscale hostname instead of
-`<mac-name>.local`. No app changes needed.
-
-**Do not** port-forward 8787 on your router — the app has no login and your
-health data would be public.
-
-### How goal saves work
-
-Saving in the UI writes `config.yaml` (and the workflow schedule for timing
-changes), then commits and pushes to GitHub. The scheduled runs pick the
-change up on the next tip. Note: the first save rewrites `config.yaml`
-without its explanatory comments — the UI is the primary editor from then on.
+A React PWA (`pwa/`) for the dashboard, weight logging, and meal logging
+(manual or photo-estimated) — see `plan.md` for the architecture and
+`docs/superpowers/specs/` for the design docs.
