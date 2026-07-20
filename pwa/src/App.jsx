@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient.js";
 import Login from "./pages/Login.jsx";
+import SetPassword from "./pages/SetPassword.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Settings from "./pages/Settings.jsx";
 import { button, textSecondary } from "./styles/ui.js";
@@ -8,6 +9,7 @@ import { button, textSecondary } from "./styles/ui.js";
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recovery, setRecovery] = useState(false);
   const [view, setView] = useState("dashboard");
 
   useEffect(() => {
@@ -15,13 +17,15 @@ export default function App() {
       setSession(data.session);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
       setSession(s);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   if (loading) return <p style={{ ...textSecondary, margin: "4rem auto", textAlign: "center" }}>Loading…</p>;
+  if (recovery) return <SetPassword onDone={() => setRecovery(false)} />;
   if (!session) return <Login />;
 
   if (view === "settings") return <Settings onDone={() => setView("dashboard")} />;
