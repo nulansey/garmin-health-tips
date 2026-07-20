@@ -10,7 +10,8 @@ import { input, buttonPrimary, button, textSecondary } from "../styles/ui.js";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [status, setStatus] = useState(null); // null | "error" | "need-email" | "reset-sent"
+  const [status, setStatus] = useState(null);
+  // null | "signin-error" | "need-email" | "reset-sent" | "reset-error" | "rate-limit"
   const [busy, setBusy] = useState(false);
 
   async function signIn(e) {
@@ -19,7 +20,7 @@ export default function Login() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) setStatus("error"); // success flips App's session -> dashboard
+    if (error) setStatus("signin-error"); // success flips App's session -> dashboard
   }
 
   async function sendReset() {
@@ -28,7 +29,8 @@ export default function Login() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + import.meta.env.BASE_URL,
     });
-    setStatus(error ? "error" : "reset-sent");
+    if (!error) return setStatus("reset-sent");
+    setStatus(error.status === 429 ? "rate-limit" : "reset-error");
   }
 
   return (
@@ -51,9 +53,11 @@ export default function Login() {
         style={{ ...button, width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--text-secondary)" }}>
         Set or reset password
       </button>
-      {status === "error" && <p style={{ color: "var(--state-over-fg)" }}>Sign-in failed — check your details or reset your password.</p>}
+      {status === "signin-error" && <p style={{ color: "var(--state-over-fg)" }}>Sign-in failed — check your password, or set one below.</p>}
       {status === "need-email" && <p style={textSecondary}>Enter your email first, then tap “Set or reset password.”</p>}
       {status === "reset-sent" && <p style={textSecondary}>Check your email for a link to set your password.</p>}
+      {status === "reset-error" && <p style={{ color: "var(--state-over-fg)" }}>Couldn’t send the reset email — try again.</p>}
+      {status === "rate-limit" && <p style={{ color: "var(--state-over-fg)" }}>Too many email attempts. Wait about an hour, then tap “Set or reset password” once.</p>}
     </form>
   );
 }
