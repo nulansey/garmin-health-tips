@@ -11,7 +11,7 @@ export default function Login() {
     setStatus(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
     });
     setStatus(error ? "error" : "sent");
   }
