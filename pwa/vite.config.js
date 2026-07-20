@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  base: "/garmin-health-tips/",
   plugins: [
     react(),
     VitePWA({
@@ -14,7 +15,7 @@ export default defineConfig({
         theme_color: "#0e1116",
         background_color: "#0e1116",
         display: "standalone",
-        start_url: "/",
+        start_url: "/garmin-health-tips/",
         icons: [
           // Placeholder: a single inline-generatable icon is enough for the
           // skeleton. Real icons are a later polish step. vite-plugin-pwa
