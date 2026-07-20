@@ -4,6 +4,7 @@
 project_id = "Garminator"
 
 [auth]
+enable_signup = false
 site_url = "https://nulansey.github.io/Garminator/"
 additional_redirect_urls = [
   "http://localhost:5173",
