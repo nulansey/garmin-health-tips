@@ -8,6 +8,10 @@ import { intakeDate } from "../lib/intakeDate.js";
 import { dayIntake, sevenDayBalance, deficitState } from "../lib/balance.js";
 import { calibrationFactor } from "../lib/calibration.js";
 import { isLowLog } from "../lib/lowLog.js";
+import {
+  sleepStages, sleepDebt, metricTrend, activeCalorieRatio,
+  weeklySteps, stepStreak, recoveryScore,
+} from "../lib/derived.js";
 import { card, badge, button, textSecondary, textMuted } from "../styles/ui.js";
 
 function hoursMinutes(seconds) {
@@ -15,6 +19,18 @@ function hoursMinutes(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.round((seconds % 3600) / 60);
   return `${h}h ${m}m`;
+}
+
+// "52 ↓3" - today's value plus its shift against the 30-day average.
+// Falls back to today's plain value when there's no baseline yet.
+function trendText(t, todayValue) {
+  if (t == null) return todayValue ?? "—";
+  const arrow = t.delta === 0 ? "→" : t.delta > 0 ? `↑${t.delta}` : `↓${-t.delta}`;
+  return `${t.today} ${arrow}`;
+}
+
+function small(text) {
+  return <span style={{ fontSize: 14 }}>{text}</span>;
 }
 
 function StatTile({ label, value }) {
@@ -102,16 +118,28 @@ export default function Dashboard() {
   const todayMeals = meals ? meals.filter((m) => m.intake_date === todayBucket) : [];
   const lowLog = meals ? isLowLog(meals, todayBucket) : false;
 
+  const stages = sleepStages(today);
+  const debt = sleepDebt(days);
+  const streak = stepStreak(days);
+  const activePct = activeCalorieRatio(today);
+
   const tiles = [
     ["Calories in", meals === null ? "—" : inToday],
     ["Calories out", burnToday ?? "—"],
     ["Steps", today.steps ?? "—"],
-    ["Resting HR", today.resting_hr ?? "—"],
-    ["Avg stress", today.avg_stress ?? "—"],
+    ["Resting HR", trendText(metricTrend(days, "resting_hr"), today.resting_hr)],
+    ["Avg stress", trendText(metricTrend(days, "avg_stress"), today.avg_stress)],
+    ["Recovery", recoveryScore(days) ?? "—"],
     ["Sleep", hoursMinutes(today.sleep_seconds)],
     ["Sleep score", today.sleep_score ?? "—"],
+    ["Sleep stages", stages === null ? "—"
+      : small(`${stages.deepPct}% deep · ${stages.remPct}% REM · ${stages.lightPct}% light`)],
+    ["Sleep debt (7d)", debt === null ? "—"
+      : debt > 0 ? `${debt}h behind` : debt < 0 ? `${-debt}h ahead` : "on target"],
     ["Body battery high", today.body_battery_high ?? "—"],
     ["Body battery low", today.body_battery_low ?? "—"],
+    ["Active cal ratio", activePct === null ? "—" : `${activePct}%`],
+    ["Steps (7d)", small(`${weeklySteps(days).toLocaleString()}${streak > 0 ? ` · ${streak}d streak` : ""}`)],
     ["7-day balance", weekBalance ?? "—"],
   ];
 
