@@ -36,6 +36,10 @@
   --series-stress: #ffb84d;
   --series-rhr: #b77bff;
   --series-sleep: #5ad1c4;
+  /* Sleep-stage ramp: one hue, dark -> pale. CVD-checked vs surface-card. */
+  --series-sleep-deep: #0f7a6c;
+  --series-sleep-rem: #45c4b3;
+  --series-sleep-light: #9fe9df;
   --series-extra: #8ee06b;
 
   /* Font weights — 400 regular, 500 emphasis. Never 600/700. */

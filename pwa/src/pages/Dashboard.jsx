@@ -3,6 +3,9 @@ import { supabase } from "../supabaseClient.js";
 import WeightForm from "../components/WeightForm.jsx";
 import WeightTrendChart from "../components/WeightTrendChart.jsx";
 import MealForm from "../components/MealForm.jsx";
+import CaloriesChart from "../components/CaloriesChart.jsx";
+import SleepChart from "../components/SleepChart.jsx";
+import RestingHrChart from "../components/RestingHrChart.jsx";
 import PhotoMealForm from "../components/PhotoMealForm.jsx";
 import { intakeDate } from "../lib/intakeDate.js";
 import { dayIntake, sevenDayBalance, deficitState } from "../lib/balance.js";
@@ -160,6 +163,14 @@ export default function Dashboard() {
           <StatTile key={label} label={label} value={value} />
         ))}
       </div>
+
+      <h2>Trends</h2>
+      <h3 style={{ ...textSecondary, fontSize: 15 }}>Calories in vs out</h3>
+      {meals === null ? <p style={textSecondary}>Loading meals…</p> : <CaloriesChart days={days} meals={meals} />}
+      <h3 style={{ ...textSecondary, fontSize: 15 }}>Sleep stages</h3>
+      <SleepChart days={days} />
+      <h3 style={{ ...textSecondary, fontSize: 15 }}>Resting HR vs 30-day band</h3>
+      <RestingHrChart days={days} />
 
       {meals === null ? (
         <p style={textSecondary}>Loading meals…</p>
