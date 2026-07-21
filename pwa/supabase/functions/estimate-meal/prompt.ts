@@ -103,18 +103,35 @@ export const DENSITIES: { name: string; kcal100g: number }[] = [
  * commit to a portion size before it can produce a calorie figure - which is
  * what makes the per-item reasoning field an accuracy feature rather than a
  * display one.
+ *
+ * `photo: false` drops the plate and bowl sentences: without an image they are
+ * meaningless, and leaving them in invites the model to reason about a plate
+ * that does not exist. Portion estimation leans on stated quantities instead.
+ * Defaults to photo mode so existing callers are unaffected.
  */
-export function systemPrompt(): string {
+export function systemPrompt({ photo = true }: { photo?: boolean } = {}): string {
   const table = DENSITIES.map((d) => `- ${d.name}: ${d.kcal100g} kcal per 100 g`).join("\n");
+  const opening = photo
+    ? [
+        "You estimate calories from a photo of a meal.",
+        "",
+        `The owner's usual dinner plate is ${PLATE_CM} cm across and their usual bowl is ${BOWL_CM} cm across - use them to judge portion size.`,
+      ]
+    : [
+        "You estimate calories from a written description of a meal.",
+        "",
+        "There is no photo. Judge portion size from any stated quantity or count in the description; where none is given, assume a typical single serving.",
+      ];
+  const sizingStep = photo
+    ? "2. Estimate its portion in grams, using the plate and bowl above for scale."
+    : "2. Estimate its portion in grams from the stated quantity, or a typical serving if none is stated.";
   return [
-    "You estimate calories from a photo of a meal.",
-    "",
-    `The owner's usual dinner plate is ${PLATE_CM} cm across and their usual bowl is ${BOWL_CM} cm across - use them to judge portion size.`,
+    ...opening,
     "Estimate generously rather than low; real portions are usually bigger than they look.",
     "",
     "For each food, work in three steps:",
     "1. Identify the food.",
-    "2. Estimate its portion in grams, using the plate and bowl above for scale.",
+    sizingStep,
     "3. Multiply that weight by the calorie density below to get its calories.",
     "",
     "State the result of steps 2 and 3 in that item's `reasoning` field, briefly - for example \"~150 g, about a deck of cards\".",

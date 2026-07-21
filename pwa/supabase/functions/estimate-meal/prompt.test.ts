@@ -129,3 +129,43 @@ describe("itemPrompt", () => {
     expect(itemPrompt([{ name: "   " }], 0)).toBe(DEFAULT_PROMPT);
   });
 });
+
+describe("systemPrompt photo/text modes", () => {
+  it("defaults to photo mode so existing callers are unaffected", () => {
+    expect(systemPrompt()).toBe(systemPrompt({ photo: true }));
+  });
+
+  it("keeps the plate and bowl scale reference in photo mode", () => {
+    const out = systemPrompt({ photo: true });
+    expect(out).toContain(String(PLATE_CM));
+    expect(out).toContain(String(BOWL_CM));
+  });
+
+  it("drops the plate and bowl reference in text mode", () => {
+    // "cm" suffix avoids a false match against unrelated numbers in the
+    // density table (e.g. steak's "271" contains "27").
+    const out = systemPrompt({ photo: false });
+    expect(out).not.toContain(`${PLATE_CM} cm`);
+    expect(out).not.toContain(`${BOWL_CM} cm`);
+  });
+
+  it("leans on stated quantities instead of scale in text mode", () => {
+    expect(systemPrompt({ photo: false })).toMatch(/stated quantit|typical serving/i);
+  });
+
+  it("carries the density table in both modes", () => {
+    for (const photo of [true, false]) {
+      const out = systemPrompt({ photo });
+      expect(out).toContain("olive oil");
+      expect(out).toContain(String(DENSITIES.find((d) => d.name === "olive oil")!.kcal100g));
+    }
+  });
+
+  it("carries the grams-then-multiply method in both modes", () => {
+    for (const photo of [true, false]) {
+      const out = systemPrompt({ photo });
+      expect(out).toMatch(/gram/i);
+      expect(out).toMatch(/multiply/i);
+    }
+  });
+});
