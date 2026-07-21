@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { itemsTotal, itemsForSave, blankItem, hasIncompleteItem } from "./mealItems.js";
+import { itemsTotal, itemsForSave, blankItem, hasIncompleteItem, withFallbackName } from "./mealItems.js";
 
 describe("itemsTotal", () => {
   it("sums calorie fields", () => {
@@ -67,5 +67,31 @@ describe("hasIncompleteItem", () => {
 describe("blankItem", () => {
   it("carries the given key and empty fields", () => {
     expect(blankItem(7)).toEqual({ key: 7, name: "", calories: "", reasoning: null });
+  });
+});
+
+describe("withFallbackName", () => {
+  it("gives a nameless row the fallback name", () => {
+    const out = withFallbackName([{ name: "", calories: 90, reasoning: null }], "Toast");
+    expect(out[0].name).toBe("Toast");
+  });
+
+  it("leaves an already-named row alone", () => {
+    const out = withFallbackName([{ name: "egg", calories: 143, reasoning: null }], "Breakfast");
+    expect(out[0].name).toBe("egg");
+  });
+
+  it("treats a whitespace-only name as nameless", () => {
+    const out = withFallbackName([{ name: "   ", calories: 90, reasoning: null }], "Toast");
+    expect(out[0].name).toBe("Toast");
+  });
+
+  it("preserves calories and reasoning untouched", () => {
+    const out = withFallbackName([{ name: "", calories: 90, reasoning: "one slice" }], "Toast");
+    expect(out[0]).toEqual({ name: "Toast", calories: 90, reasoning: "one slice" });
+  });
+
+  it("is empty for an empty list", () => {
+    expect(withFallbackName([], "Toast")).toEqual([]);
   });
 });

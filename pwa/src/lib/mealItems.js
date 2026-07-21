@@ -44,3 +44,20 @@ export function hasIncompleteItem(items) {
 export function blankItem(key) {
   return { key, name: "", calories: "", reasoning: null };
 }
+
+/**
+ * Fill in a nameless row's name from the meal name.
+ *
+ * Runs on save-shape rows (after itemsForSave), never before it: applying a
+ * fallback first would give a fully blank row a name and resurrect it into the
+ * saved list instead of dropping it.
+ *
+ * This is what keeps the fast path fast - meal name plus one calorie number,
+ * without separately naming the single item.
+ */
+export function withFallbackName(rows, fallback) {
+  return (rows ?? []).map((r) => ({
+    ...r,
+    name: String(r.name ?? "").trim() || fallback,
+  }));
+}
