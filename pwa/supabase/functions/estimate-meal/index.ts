@@ -1,6 +1,7 @@
 // Supabase Edge Function: estimate a meal's calories from a photo.
 // Deno runtime. No secrets in the client — ANTHROPIC_API_KEY is a function secret.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mealPrompt } from "./prompt.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +35,7 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-async function estimate(imageB64: string) {
+async function estimate(imageB64: string, name?: unknown) {
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -52,7 +53,7 @@ async function estimate(imageB64: string) {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } },
-            { type: "text", text: "Estimate the calories in this meal." },
+            { type: "text", text: mealPrompt(name) },
           ],
         },
       ],
@@ -98,14 +99,20 @@ Deno.serve(async (req) => {
     return new Response("method not allowed", { status: 405, headers: CORS });
   }
   try {
-    const { image } = await req.json();
+    const { image, name } = await req.json();
     if (!image || typeof image !== "string") {
       return json({ error: "missing image" }, 400);
+    }
+    // Absent is fine (first estimate). Present-but-not-a-string is a client
+    // bug worth surfacing; over-length is truncated in normalizeName, since
+    // the realistic cause is a rambling description, not an attack.
+    if (name !== undefined && name !== null && typeof name !== "string") {
+      return json({ error: "invalid name" }, 400);
     }
     if (!(await underCap(req.headers.get("Authorization")))) {
       return json({ error: "daily photo limit reached" }, 429);
     }
-    return await estimate(image);
+    return await estimate(image, name);
   } catch {
     return json({ error: "bad request" }, 400);
   }
