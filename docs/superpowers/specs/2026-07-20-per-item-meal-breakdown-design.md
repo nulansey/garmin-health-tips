@@ -194,24 +194,45 @@ so the system prompt becomes testable rather than an untested literal in
   number` for the per-item path, validated the same way `name` already is:
   wrong type is a 400, absent is the existing behavior.
 
-### `pwa/src/components/PhotoMealForm.jsx`
+### `pwa/src/components/MealItemsEditor.jsx` — new, shared
 
-The confirm screen becomes a list of item rows rather than one name/calorie
-pair. Per item: an editable name input, an editable calorie input, a
-recalculate control, a remove control, and the reasoning below in muted text.
-Above them, the editable meal name (defaulting to the joined item names) and
-the derived read-only total. Below them, an "Add item" button appending a blank
-row (`{name: "", calories: "", reasoning: null}`).
+The item list is built as a standalone component from the outset, not inlined
+into `PhotoMealForm`. A follow-up spec
+(`2026-07-20-manual-meal-items-and-text-estimate-design.md`) gives manual meal
+entry the same editor; building it shared now costs almost nothing and avoids
+extracting it under a second feature's pressure later.
 
-State moves from `name`/`calories` scalars to an `items` array plus a separate
-`mealName`. `recalculate(index)` replaces the current whole-meal
-`recalculate()`; the in-flight lock becomes per-row so one item recalculating
-does not disable the others' inputs.
+Props:
+
+- `items` — the array of `{key, name, calories, reasoning}`
+- `onChange(items)` — the parent owns the array; this component is controlled
+- `onRecalculate(index)` — optional. When omitted, no recalculate control is
+  rendered, which is what a photo-less caller needs.
+- `busyIndex` — index currently recalculating, or `null`
+
+It renders one row per item — editable name, editable calories, a remove
+control, a recalculate control when `onRecalculate` is supplied, and the
+reasoning beneath in muted text — plus an "Add item" button appending
+`{key, name: "", calories: "", reasoning: null}`.
 
 Rows need stable React keys that survive add, remove, and reorder. Array index
 is not sufficient — removing a middle row would make every subsequent row's
 input remount and lose focus mid-edit. Each row carries a client-side `key`
-(an incrementing counter) that is not persisted.
+(an incrementing counter) that is never persisted.
+
+The component owns no meal-level concerns: no meal name, no total, no save, no
+network. Those stay with the parent.
+
+### `pwa/src/components/PhotoMealForm.jsx`
+
+The confirm screen composes `MealItemsEditor` above the derived read-only total
+and the editable meal name (defaulting to the joined item names).
+
+State moves from `name`/`calories` scalars to an `items` array plus a separate
+`mealName`. `recalculate(index)` replaces the current whole-meal
+`recalculate()` and is passed to the editor as `onRecalculate`; the in-flight
+lock becomes per-row via `busyIndex`, so one item recalculating does not
+disable the others' inputs.
 
 Save inserts one row: `mealName`, the summed calories, `source: 'photo'`, and
 the items array into the new column. Blank rows — no name and no calories — are
@@ -219,16 +240,16 @@ dropped at save rather than persisted as empty objects. Saving is blocked while
 any row has a name but no calories, since that item would silently contribute
 zero to the total.
 
-This component is doing appreciably more than it was. If the item-row markup
-makes the file unwieldy, extracting a presentational `MealItemRow` is in scope;
-splitting further is not.
-
 ### `pwa/src/pages/Dashboard.jsx`
 
 `loadMeals`'s select adds `items`. Each meal row in the daily list renders an
 expand arrow when `m.items` is non-empty, toggling a read-only indented
-breakdown. Rows without items (every manual meal, every pre-migration row)
-render exactly as they do now — no arrow, no layout shift.
+breakdown. Rows with no items render exactly as they do now — no arrow, no
+layout shift.
+
+The condition is deliberately "has items", not "is a photo meal": the follow-up
+spec gives manual meals item breakdowns too, and they should get the same arrow
+with no further change here.
 
 ## Testing
 
