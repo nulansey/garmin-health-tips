@@ -26,6 +26,27 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # Fetch immediately before the tip rather than relying on fetch.yml's
+      # schedule. That workflow asks for every 30 min but Actions throttles
+      # scheduled runs to ~90 min in practice (sometimes 3h+), which left the
+      # 7am briefing computing on data that predated the night's sleep.
+      #
+      # Best effort on purpose: both steps are continue-on-error so a Garmin
+      # auth failure degrades to "tip from stored data" instead of no tip at
+      # all. fetch.yml stays the run that fails loudly when tokens expire.
+      - name: Restore Garmin tokens
+        continue-on-error: true
+        run: |
+          mkdir -p ~
+          echo "${{ secrets.GARMIN_TOKEN_B64 }}" | base64 -d | tar -xzf - -C ~
+
+      - name: Fetch latest Garmin data
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m src.fetch
+
       - name: Send tip
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
