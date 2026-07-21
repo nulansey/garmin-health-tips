@@ -2,14 +2,15 @@ import { useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import { intakeDate } from "../lib/intakeDate.js";
 import { resizeImage } from "../lib/resizeImage.js";
-import { input, button, buttonPrimary } from "../styles/ui.js";
+import { itemsTotal, itemsForSave, hasIncompleteItem } from "../lib/mealItems.js";
+import MealItemsEditor from "./MealItemsEditor.jsx";
+import { input, button, buttonPrimary, textSecondary } from "../styles/ui.js";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/estimate-meal`;
 
-// Posts the photo for a calorie estimate. `name`, when given, tells the model
-// what the food actually is so it only has to judge portion size - that is how
-// a misidentified meal gets corrected. Throws on any non-OK response.
-async function callEstimate(image, name) {
+// One call for both paths. `body` is either {image} for a first estimate or
+// {image, items, itemIndex} to re-price a single item. Throws on non-OK.
+async function callEstimate(body) {
   const { data: { session } } = await supabase.auth.getSession();
   const resp = await fetch(FUNCTION_URL, {
     method: "POST",
@@ -17,20 +18,21 @@ async function callEstimate(image, name) {
       "content-type": "application/json",
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify(name ? { image, name } : { image }),
+    body: JSON.stringify(body),
   });
   if (!resp.ok) throw new Error("estimate failed");
   return await resp.json();
 }
 
 export default function PhotoMealForm({ onSaved }) {
-  // idle | estimating | confirm | recalculating | error
+  // idle | estimating | confirm | error
   const [status, setStatus] = useState("idle");
-  const [name, setName] = useState("");
-  const [calories, setCalories] = useState("");
-  // Kept only so the confirm screen can re-estimate. Never persisted, and
+  const [mealName, setMealName] = useState("");
+  const [items, setItems] = useState([]);
+  // Kept only so the confirm screen can re-price items. Never persisted, and
   // dropped on save or cancel.
   const [image, setImage] = useState(null);
+  const [busyIndex, setBusyIndex] = useState(null);
   const [recalcFailed, setRecalcFailed] = useState(false);
 
   async function onPick(e) {
@@ -39,71 +41,108 @@ export default function PhotoMealForm({ onSaved }) {
     setStatus("estimating");
     try {
       const b64 = await resizeImage(file);
-      const est = await callEstimate(b64);
+      const est = await callEstimate({ image: b64 });
+      const rows = (est.items ?? []).map((it, i) => ({
+        key: i,
+        name: it.name ?? "",
+        calories: String(it.estimated_calories ?? ""),
+        reasoning: it.reasoning ?? null,
+      }));
       setImage(b64);
-      setName(est.items?.map((i) => i.name).join(", ") || "Meal");
-      setCalories(String(est.total_calories ?? ""));
+      setItems(rows);
+      setMealName(rows.map((r) => r.name).join(", ") || "Meal");
       setStatus("confirm");
     } catch {
       setStatus("error");
     }
   }
 
-  // Re-price the same photo against the corrected name. Only the calorie field
-  // changes - the name was just typed by hand, so overwriting it would undo
-  // the correction. On failure the existing estimate is left intact.
-  async function recalculate() {
+  // Re-price ONE item against the same photo. The whole plate goes along as
+  // context so the model prices the named item rather than the entire plate.
+  // Every other row - including manual edits - is left alone.
+  async function recalculate(i) {
     setRecalcFailed(false);
-    setStatus("recalculating");
+    setBusyIndex(i);
     try {
-      const est = await callEstimate(image, name);
-      setCalories(String(est.total_calories ?? ""));
+      const est = await callEstimate({
+        image,
+        items: items.map((it) => ({ name: it.name })),
+        itemIndex: i,
+      });
+      const first = est.items?.[0];
+      setItems((prev) =>
+        prev.map((it, n) =>
+          n === i
+            ? {
+                ...it,
+                calories: String(est.total_calories ?? it.calories),
+                reasoning: first?.reasoning ?? it.reasoning,
+              }
+            : it,
+        ),
+      );
     } catch {
       setRecalcFailed(true);
     }
-    setStatus("confirm");
+    setBusyIndex(null);
   }
 
   function reset() {
     setStatus("idle");
-    setName("");
-    setCalories("");
+    setMealName("");
+    setItems([]);
     setImage(null);
+    setBusyIndex(null);
     setRecalcFailed(false);
   }
 
   async function confirm(e) {
     e.preventDefault();
+    const rows = itemsForSave(items);
     const { error } = await supabase.from("meals").insert({
-      name,
-      calories: Number(calories),
+      name: mealName,
+      calories: itemsTotal(items),
       source: "photo",
       eaten_at: new Date().toISOString(),
       intake_date: intakeDate(),
+      items: rows.length ? rows : null,
     });
     if (error) { setStatus("error"); return; }
     reset();
     onSaved();
   }
 
-  if (status === "confirm" || status === "recalculating") {
-    const busy = status === "recalculating";
+  if (status === "confirm") {
+    const total = itemsTotal(items);
+    const incomplete = hasIncompleteItem(items);
     return (
-      <form onSubmit={confirm} style={{ display: "flex", gap: 8, margin: "1rem 0", flexWrap: "wrap" }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} required
-          style={{ ...input, flex: 2, minWidth: 120 }} />
-        <input type="number" value={calories} onChange={(e) => setCalories(e.target.value)} required
-          style={{ ...input, flex: 1, minWidth: 90 }} />
-        <button type="button" onClick={recalculate} disabled={busy} style={button}>
-          {busy ? "Recalculating…" : "↻ Recalculate"}
-        </button>
-        <button type="submit" style={buttonPrimary}>Save</button>
-        <button type="button" onClick={reset} style={button}>Cancel</button>
-        {recalcFailed && (
-          <span style={{ color: "var(--state-over-fg)", width: "100%" }}>
-            Recalculate failed — the estimate above is unchanged.
-          </span>
+      <form onSubmit={confirm} style={{ margin: "1rem 0" }}>
+        <input
+          value={mealName}
+          onChange={(e) => setMealName(e.target.value)}
+          required
+          placeholder="Meal"
+          style={{ ...input, width: "100%", marginBottom: 8, boxSizing: "border-box" }}
+        />
+        <MealItemsEditor
+          items={items}
+          onChange={setItems}
+          onRecalculate={recalculate}
+          busyIndex={busyIndex}
+        />
+        <div style={{ margin: "12px 0", fontWeight: "var(--font-weight-emphasis)" }}>
+          Total: {total} kcal
+        </div>
+        {incomplete && (
+          <p style={textSecondary}>Give every named item a calorie number before saving.</p>
         )}
+        {recalcFailed && (
+          <p style={{ color: "var(--state-over-fg)" }}>
+            Recalculate failed — the item above is unchanged.
+          </p>
+        )}
+        <button type="submit" disabled={incomplete} style={buttonPrimary}>Save</button>
+        <button type="button" onClick={reset} style={{ ...button, marginLeft: 8 }}>Cancel</button>
       </form>
     );
   }
