@@ -1,7 +1,7 @@
 # Per-item meal breakdown, portion reasoning, and a calorie-density reference
 
 **Date:** 2026-07-20
-**Status:** approved, not yet implemented
+**Status:** implemented 2026-07-21
 
 **Scope:** Make the photo-meal estimate more accurate and more correctable.
 Three changes that share one prompt and one screen: the model states its
