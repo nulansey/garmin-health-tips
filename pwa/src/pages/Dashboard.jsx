@@ -61,6 +61,7 @@ export default function Dashboard() {
   const [weights, setWeights] = useState(null);
   const [meals, setMeals] = useState(null);
   const [goal, setGoal] = useState(null);
+  const [expandedMeal, setExpandedMeal] = useState(null);
 
   async function load() {
     setError(false);
@@ -85,7 +86,7 @@ export default function Dashboard() {
   async function loadMeals() {
     const { data } = await supabase
       .from("meals")
-      .select("id, intake_date, name, calories")
+      .select("id, intake_date, name, calories, items")
       .order("eaten_at", { ascending: false });
     setMeals(data ?? []);
   }
@@ -211,12 +212,45 @@ export default function Dashboard() {
           <MealForm onSaved={loadMeals} />
           <PhotoMealForm onSaved={loadMeals} />
           <ul style={{ listStyle: "none", padding: 0 }}>
-            {todayMeals.map((m) => (
-              <li key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-                <span>{m.name} — {m.calories}</span>
-                <button onClick={() => deleteMeal(m.id)} style={{ ...button, padding: "2px 8px" }}>Delete</button>
-              </li>
-            ))}
+            {todayMeals.map((m) => {
+              // Keyed on "has items", not "is a photo meal" - manual meals get
+              // breakdowns in the follow-up spec and should need no change here.
+              const breakdown = m.items?.length ? m.items : null;
+              const open = expandedMeal === m.id;
+              return (
+                <li key={m.id} style={{ padding: "4px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>
+                      {breakdown && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedMeal(open ? null : m.id)}
+                          aria-expanded={open}
+                          aria-label={`${open ? "Hide" : "Show"} items for ${m.name}`}
+                          style={{ ...button, padding: "0 6px", marginRight: 6, background: "none", border: "none" }}
+                        >
+                          {open ? "▾" : "▸"}
+                        </button>
+                      )}
+                      {m.name} — {m.calories}
+                    </span>
+                    <button onClick={() => deleteMeal(m.id)} style={{ ...button, padding: "2px 8px" }}>Delete</button>
+                  </div>
+                  {open && breakdown && (
+                    <ul style={{ listStyle: "none", padding: "4px 0 4px 22px", margin: 0 }}>
+                      {breakdown.map((it, i) => (
+                        <li key={i} style={{ ...textSecondary, fontSize: 14, padding: "2px 0" }}>
+                          {it.name} — {it.calories}
+                          {it.reasoning && (
+                            <div style={{ ...textMuted, fontSize: 13 }}>{it.reasoning}</div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
