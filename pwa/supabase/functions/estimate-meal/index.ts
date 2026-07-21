@@ -1,18 +1,13 @@
 // Supabase Edge Function: estimate a meal's calories from a photo.
 // Deno runtime. No secrets in the client — ANTHROPIC_API_KEY is a function secret.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { mealPrompt } from "./prompt.ts";
+import { mealPrompt, itemPrompt, systemPrompt } from "./prompt.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-const PLATE_CM = 27; // owner's usual dinner plate diameter
-const BOWL_CM = 15;  // owner's usual bowl diameter
-
-const SYSTEM = `You estimate calories from a photo of a meal. The owner's usual dinner plate is ${PLATE_CM} cm across and their usual bowl is ${BOWL_CM} cm across — use them to judge portion size. Estimate generously rather than low; real portions are usually bigger than they look. Return only the structured JSON.`;
 
 const SCHEMA = {
   type: "object",
@@ -24,8 +19,9 @@ const SCHEMA = {
         properties: {
           name: { type: "string" },
           estimated_calories: { type: "integer" },
+          reasoning: { type: "string" },
         },
-        required: ["name", "estimated_calories"],
+        required: ["name", "estimated_calories", "reasoning"],
         additionalProperties: false,
       },
     },
@@ -35,7 +31,15 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-async function estimate(imageB64: string, name?: unknown) {
+// `items` + `itemIndex` re-price one item on the plate; `name` corrects the
+// whole meal; neither is a first estimate. Exactly one prompt is chosen here.
+async function estimate(
+  imageB64: string,
+  name?: unknown,
+  items?: unknown,
+  itemIndex?: unknown,
+) {
+  const text = Array.isArray(items) ? itemPrompt(items, itemIndex) : mealPrompt(name);
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -46,14 +50,14 @@ async function estimate(imageB64: string, name?: unknown) {
     body: JSON.stringify({
       model: "claude-haiku-4-5",
       max_tokens: 1024,
-      system: SYSTEM,
+      system: systemPrompt(),
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [
         {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } },
-            { type: "text", text: mealPrompt(name) },
+            { type: "text", text },
           ],
         },
       ],
@@ -99,7 +103,7 @@ Deno.serve(async (req) => {
     return new Response("method not allowed", { status: 405, headers: CORS });
   }
   try {
-    const { image, name } = await req.json();
+    const { image, name, items, itemIndex } = await req.json();
     if (!image || typeof image !== "string") {
       return json({ error: "missing image" }, 400);
     }
@@ -109,10 +113,13 @@ Deno.serve(async (req) => {
     if (name !== undefined && name !== null && typeof name !== "string") {
       return json({ error: "invalid name" }, 400);
     }
+    if (items !== undefined && !Array.isArray(items)) {
+      return json({ error: "invalid items" }, 400);
+    }
     if (!(await underCap(req.headers.get("Authorization")))) {
       return json({ error: "daily photo limit reached" }, 429);
     }
-    return await estimate(image, name);
+    return await estimate(image, name, items, itemIndex);
   } catch {
     return json({ error: "bad request" }, 400);
   }
