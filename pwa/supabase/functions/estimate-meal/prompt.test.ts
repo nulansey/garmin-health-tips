@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   mealPrompt, normalizeName, MAX_NAME, DEFAULT_PROMPT,
-  DENSITIES, systemPrompt, PLATE_CM, BOWL_CM, itemPrompt,
+  DENSITIES, systemPrompt, PLATE_CM, BOWL_CM, itemPrompt, textPrompt,
 } from "./prompt.ts";
 
 describe("normalizeName", () => {
@@ -167,5 +167,32 @@ describe("systemPrompt photo/text modes", () => {
       expect(out).toMatch(/gram/i);
       expect(out).toMatch(/multiply/i);
     }
+  });
+});
+
+describe("textPrompt", () => {
+  it("embeds the description", () => {
+    expect(textPrompt("2 eggs and a sausage")).toContain("2 eggs and a sausage");
+  });
+
+  it("asks for one item per distinct food", () => {
+    expect(textPrompt("2 eggs and a sausage")).toMatch(/one item per|separate item|each distinct food/i);
+  });
+
+  it("tells the model to honour stated counts", () => {
+    expect(textPrompt("2 eggs and a sausage")).toMatch(/count|quantit/i);
+  });
+
+  it("truncates a long description like every other owner-supplied string", () => {
+    const out = textPrompt("d".repeat(500));
+    expect(out).toContain("d".repeat(MAX_NAME));
+    expect(out).not.toContain("d".repeat(MAX_NAME + 1));
+  });
+
+  it("falls back to the default prompt on blank or non-string input", () => {
+    expect(textPrompt("")).toBe(DEFAULT_PROMPT);
+    expect(textPrompt("   ")).toBe(DEFAULT_PROMPT);
+    expect(textPrompt(undefined)).toBe(DEFAULT_PROMPT);
+    expect(textPrompt(42)).toBe(DEFAULT_PROMPT);
   });
 });

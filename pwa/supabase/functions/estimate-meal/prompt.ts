@@ -184,3 +184,29 @@ export function itemPrompt(items: { name?: unknown }[], index: unknown): string 
     "Return the single item in `items` and its calories as `total_calories`.",
   ].join("\n");
 }
+
+/**
+ * The user turn for a text-only estimate.
+ *
+ * A written description is often easier to price than a photo: "2 eggs" is a
+ * count against a known density with no portion inference at all, where a
+ * photo of the same plate needs the egg size guessed. So the instruction leans
+ * hard on splitting the description into distinct foods and honouring whatever
+ * counts the owner stated.
+ *
+ * The description is untrusted owner input and gets the same 200-character cap
+ * and user-turn placement as every other such string.
+ */
+export function textPrompt(description: unknown): string {
+  const clean = normalizeName(description);
+  if (!clean) return DEFAULT_PROMPT;
+  return [
+    `The owner ate: ${clean}`,
+    "",
+    "Break this into one item per distinct food. Honour any stated count or",
+    "quantity exactly - \"2 eggs\" is two eggs, not one - and where no quantity",
+    "is given, assume one typical serving.",
+    "",
+    "Estimate the calories for each item, then total them.",
+  ].join("\n");
+}
