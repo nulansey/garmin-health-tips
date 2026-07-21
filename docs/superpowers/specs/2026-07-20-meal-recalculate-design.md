@@ -1,7 +1,7 @@
 # Recalculate a photo estimate from a corrected meal name
 
 **Date:** 2026-07-20
-**Status:** approved, not yet implemented
+**Status:** implemented 2026-07-21
 
 **Scope:** On the photo-meal confirm screen, let the owner correct the meal
 name and re-run the calorie estimate against the same photo. Fixes the case
