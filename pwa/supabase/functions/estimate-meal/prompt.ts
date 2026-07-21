@@ -125,3 +125,45 @@ export function systemPrompt(): string {
     "Return only the structured JSON.",
   ].join("\n");
 }
+
+/**
+ * The user turn for re-pricing ONE item on a plate.
+ *
+ * Naming the corrected item alone is not enough: given a photo of chicken,
+ * rice and broccoli and the single name "fried rice", the model can reasonably
+ * price the entire plate as fried rice - a plausible, badly wrong number. So
+ * the whole plate goes in as context and the target is named explicitly.
+ *
+ * A hand-added item may not be in the photo at all (a drink out of frame), so
+ * the model is told to fall back to a typical serving and say so, rather than
+ * hunting for food that is not there or refusing.
+ *
+ * Returns DEFAULT_PROMPT for input it cannot form a sensible instruction from,
+ * rather than emitting a malformed one.
+ */
+export function itemPrompt(items: { name?: unknown }[], index: unknown): string {
+  if (!Array.isArray(items) || items.length === 0) return DEFAULT_PROMPT;
+  if (typeof index !== "number" || !Number.isInteger(index)) return DEFAULT_PROMPT;
+  if (index < 0 || index >= items.length) return DEFAULT_PROMPT;
+
+  const names = items.map((it) => normalizeName(it?.name));
+  const target = names[index];
+  if (!target) return DEFAULT_PROMPT;
+
+  const listed = names.map((n, i) => `${i + 1}. ${n || "(unnamed)"}`).join("\n");
+  return [
+    "This photo contains these items:",
+    listed,
+    "",
+    `The owner says item ${index + 1} is: ${target}`,
+    "",
+    "Trust that identification over your own reading of the image. Estimate",
+    `calories for only "${target}" as it appears in this photo - not the whole plate,`,
+    "and not the other items listed above.",
+    "",
+    `If you cannot find "${target}" in the photo, assume a typical single`,
+    "serving of it and say so in the reasoning.",
+    "",
+    "Return the single item in `items` and its calories as `total_calories`.",
+  ].join("\n");
+}

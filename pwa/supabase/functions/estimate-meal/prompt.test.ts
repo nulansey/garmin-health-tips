@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   mealPrompt, normalizeName, MAX_NAME, DEFAULT_PROMPT,
-  DENSITIES, systemPrompt, PLATE_CM, BOWL_CM,
+  DENSITIES, systemPrompt, PLATE_CM, BOWL_CM, itemPrompt,
 } from "./prompt.ts";
 
 describe("normalizeName", () => {
@@ -91,5 +91,41 @@ describe("systemPrompt", () => {
 
   it("still tells the model to estimate generously", () => {
     expect(systemPrompt()).toMatch(/generous/i);
+  });
+});
+
+describe("itemPrompt", () => {
+  const plate = [{ name: "chicken breast" }, { name: "white rice" }, { name: "broccoli" }];
+
+  it("names the target item and constrains scope to it", () => {
+    const out = itemPrompt(plate, 1);
+    expect(out).toContain("white rice");
+    expect(out).toMatch(/only/i);
+    expect(out).toMatch(/not the whole plate/i);
+  });
+
+  it("includes the other items as context so the model knows which region", () => {
+    const out = itemPrompt(plate, 1);
+    expect(out).toContain("chicken breast");
+    expect(out).toContain("broccoli");
+  });
+
+  it("tells the model to assume a typical serving when the item is not visible", () => {
+    const out = itemPrompt(plate, 1);
+    expect(out).toMatch(/not visible|cannot find|typical serving/i);
+  });
+
+  it("truncates a long item name like every other owner-supplied string", () => {
+    const out = itemPrompt([{ name: "c".repeat(500) }], 0);
+    expect(out).toContain("c".repeat(MAX_NAME));
+    expect(out).not.toContain("c".repeat(MAX_NAME + 1));
+  });
+
+  it("falls back to the whole-meal prompt on unusable input", () => {
+    expect(itemPrompt(plate, 9)).toBe(DEFAULT_PROMPT);
+    expect(itemPrompt(plate, -1)).toBe(DEFAULT_PROMPT);
+    expect(itemPrompt(plate, "x")).toBe(DEFAULT_PROMPT);
+    expect(itemPrompt([], 0)).toBe(DEFAULT_PROMPT);
+    expect(itemPrompt([{ name: "   " }], 0)).toBe(DEFAULT_PROMPT);
   });
 });
