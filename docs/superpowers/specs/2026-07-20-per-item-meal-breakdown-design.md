@@ -41,24 +41,30 @@ fix.
    never edited — it explains a number rather than producing one.
 2. **Name and calories are editable per item.** These are the fields that
    determine what gets saved, so both are inputs.
-3. **The meal total is derived, not typed.** It is the sum of the item calorie
+3. **Items can be added and removed.** The model misses things — a drink out of
+   frame, a sauce — and occasionally invents or over-splits one. An "Add item"
+   control appends a blank row; each row carries a remove control. A
+   hand-added item is a first-class item: it can be priced by recalculation
+   like any other (see below), and it saves into `items` indistinguishably from
+   a model-produced one.
+4. **The meal total is derived, not typed.** It is the sum of the item calorie
    fields and is read-only on the confirm screen. Editing a number means
    editing the item that is wrong.
-4. **Saving still writes exactly one `meals` row.** Name is the joined item
+5. **Saving still writes exactly one `meals` row.** Name is the joined item
    names, calories the summed total — unchanged from today, so `dayIntake`,
    `sevenDayBalance`, `calibrationFactor`, `isLowLog`, and `CaloriesChart` all
    keep working untouched. The breakdown additionally persists in a new
    nullable `items` jsonb column.
-5. **Saved breakdowns are viewable but not editable.** The dashboard's meal
+6. **Saved breakdowns are viewable but not editable.** The dashboard's meal
    list gets an expand arrow on rows that have `items`. Expanding shows the
    read-only breakdown. Correcting a saved meal is still delete-and-redo, as
    today.
-6. **Per-item recalculation passes the full plate as context.** See
+7. **Per-item recalculation passes the full plate as context.** See
    "Per-item recalculation" below — this is the part most likely to be got
    wrong.
-7. **The density reference is static and lives in the system prompt.** No live
+8. **The density reference is static and lives in the system prompt.** No live
    nutrition API. See "Why not a live nutrition API" below.
-8. **The density table is a reference, not a whitelist.** Foods absent from it
+9. **The density table is a reference, not a whitelist.** Foods absent from it
    are estimated from the model's own knowledge as they are today. It anchors
    the common, high-impact cases; it does not constrain the menu.
 
@@ -82,6 +88,17 @@ The recalculation prompt therefore carries the whole plate and names the target:
 The response reuses the existing schema; the client takes `total_calories` from
 it as that single item's new calorie value and leaves every other item
 untouched. One item fixed per call, other items' manual edits preserved.
+
+A hand-added item uses this same path, which means the named food may not be
+in the photo at all — a drink out of frame, a side eaten before the photo. The
+prompt therefore tells the model to estimate a typical single serving when it
+cannot find the named item, and to say so in its reasoning ("not visible in
+photo; assumed a typical 350 ml glass"). Without that instruction the model is
+left to either hunt for a food that is not there or refuse, and both produce a
+worse number than an honest typical-serving estimate.
+
+Recalculation is unavailable on a row with a blank name; there is nothing to
+price. The control is disabled until a name is typed.
 
 ## Calorie-density reference
 
@@ -144,9 +161,14 @@ Stored shape:
 ```json
 [
   {"name": "chicken breast", "calories": 250, "reasoning": "~150 g, about a deck of cards"},
-  {"name": "white rice",     "calories": 260, "reasoning": "~200 g, filling half a 27 cm plate"}
+  {"name": "white rice",     "calories": 260, "reasoning": "~200 g, filling half a 27 cm plate"},
+  {"name": "orange juice",   "calories": 110, "reasoning": null}
 ]
 ```
+
+`reasoning` is null for a hand-added item that was never recalculated — the
+number came from the owner, not the model, and inventing an explanation for it
+would be a lie. The UI renders nothing in that slot rather than a placeholder.
 
 ### `pwa/supabase/functions/estimate-meal/prompt.ts`
 
@@ -176,17 +198,26 @@ so the system prompt becomes testable rather than an untested literal in
 
 The confirm screen becomes a list of item rows rather than one name/calorie
 pair. Per item: an editable name input, an editable calorie input, a
-recalculate control, and the reasoning below in muted text. Above them, the
-editable meal name (defaulting to the joined item names) and the derived
-read-only total.
+recalculate control, a remove control, and the reasoning below in muted text.
+Above them, the editable meal name (defaulting to the joined item names) and
+the derived read-only total. Below them, an "Add item" button appending a blank
+row (`{name: "", calories: "", reasoning: null}`).
 
 State moves from `name`/`calories` scalars to an `items` array plus a separate
 `mealName`. `recalculate(index)` replaces the current whole-meal
 `recalculate()`; the in-flight lock becomes per-row so one item recalculating
 does not disable the others' inputs.
 
+Rows need stable React keys that survive add, remove, and reorder. Array index
+is not sufficient — removing a middle row would make every subsequent row's
+input remount and lose focus mid-edit. Each row carries a client-side `key`
+(an incrementing counter) that is not persisted.
+
 Save inserts one row: `mealName`, the summed calories, `source: 'photo'`, and
-the items array into the new column.
+the items array into the new column. Blank rows — no name and no calories — are
+dropped at save rather than persisted as empty objects. Saving is blocked while
+any row has a name but no calories, since that item would silently contribute
+zero to the total.
 
 This component is doing appreciably more than it was. If the item-row markup
 makes the file unwieldy, extracting a presentational `MealItemRow` is in scope;
@@ -210,14 +241,19 @@ Automated, in `prompt.test.ts` (the pure module — vitest reaches
   density line, and the grams-then-multiply instruction.
 - `mealPrompt` retains every behavior from its existing suite (unchanged
   default with no name, correction phrasing with one, truncation at 200).
-- `itemPrompt` names the target item, includes the other items as context, and
-  contains an explicit "only that item" constraint; out-of-range and empty
-  index inputs fall back to `mealPrompt` rather than emitting a malformed
-  prompt.
+- `itemPrompt` names the target item, includes the other items as context,
+  contains an explicit "only that item" constraint, and carries the
+  not-visible-in-photo fallback instruction; out-of-range and empty index
+  inputs fall back to `mealPrompt` rather than emitting a malformed prompt.
 
-A new pure helper `itemsTotal(items)` (summing, tolerating blank and
-non-numeric calorie fields mid-edit) is unit tested alongside the existing
-`lib/` helpers.
+Two new pure helpers are unit tested alongside the existing `lib/` helpers:
+
+- `itemsTotal(items)` — sums, tolerating blank and non-numeric calorie fields
+  mid-edit. Covers: a normal list, a list mid-edit with one blank field, an
+  empty list (returns 0), and non-numeric junk.
+- `itemsForSave(items)` — drops blank rows and strips the client-side `key`
+  before insert. Covers: blank rows removed, a name-only row retained (the save
+  guard catches it separately), keys absent from the output.
 
 Manual, since the vision call cannot be asserted on:
 
@@ -229,9 +265,14 @@ Manual, since the vision call cannot be asserted on:
    manual edits are untouched, and the returned number is plausible *for that
    item alone* — not near the whole-plate total. This is the check that the
    context-carrying prompt is working.
-3. Save, then expand the meal in the daily list and confirm the breakdown
-   matches what was saved.
-4. Log a manual meal and confirm it renders with no expand arrow.
+3. Add an item the model could not have seen (a drink out of frame), name it,
+   and recalculate that row. Confirm a plausible typical-serving number comes
+   back and the reasoning says it was not visible.
+4. Remove an item mid-list and confirm the remaining rows keep their typed
+   values and do not lose focus — this is the check that row keys are stable.
+5. Save, then expand the meal in the daily list and confirm the breakdown
+   matches what was saved, including the hand-added item.
+6. Log a manual meal and confirm it renders with no expand arrow.
 
 ## Out of scope
 
