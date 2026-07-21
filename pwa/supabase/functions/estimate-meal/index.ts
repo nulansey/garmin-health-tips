@@ -1,7 +1,7 @@
 // Supabase Edge Function: estimate a meal's calories from a photo.
 // Deno runtime. No secrets in the client — ANTHROPIC_API_KEY is a function secret.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { mealPrompt, itemPrompt, systemPrompt } from "./prompt.ts";
+import { mealPrompt, itemPrompt, systemPrompt, textPrompt } from "./prompt.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -31,15 +31,32 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-// `items` + `itemIndex` re-price one item on the plate; `name` corrects the
-// whole meal; neither is a first estimate. Exactly one prompt is chosen here.
-async function estimate(
-  imageB64: string,
-  name?: unknown,
-  items?: unknown,
-  itemIndex?: unknown,
-) {
-  const text = Array.isArray(items) ? itemPrompt(items, itemIndex) : mealPrompt(name);
+type EstimateArgs = {
+  image?: unknown;
+  name?: unknown;
+  items?: unknown;
+  itemIndex?: unknown;
+  text?: unknown;
+};
+
+// Exactly one prompt is chosen here. With a photo: `items` + `itemIndex`
+// re-price one item on the plate, `name` corrects the whole meal, neither is a
+// first estimate. Without a photo it is a written description instead, and the
+// system prompt drops the plate scale reference that would make no sense.
+async function estimate({ image, name, items, itemIndex, text }: EstimateArgs) {
+  const photo = typeof image === "string" && image !== "";
+  const userText = photo
+    ? (Array.isArray(items) ? itemPrompt(items, itemIndex) : mealPrompt(name))
+    : textPrompt(text);
+  const content: unknown[] = [];
+  if (photo) {
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: "image/jpeg", data: image },
+    });
+  }
+  content.push({ type: "text", text: userText });
+
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -50,17 +67,9 @@ async function estimate(
     body: JSON.stringify({
       model: "claude-haiku-4-5",
       max_tokens: 1024,
-      system: systemPrompt(),
+      system: systemPrompt({ photo }),
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } },
-            { type: "text", text },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content }],
     }),
   });
   if (!resp.ok) {
@@ -103,9 +112,21 @@ Deno.serve(async (req) => {
     return new Response("method not allowed", { status: 405, headers: CORS });
   }
   try {
-    const { image, name, items, itemIndex } = await req.json();
-    if (!image || typeof image !== "string") {
-      return json({ error: "missing image" }, 400);
+    const { image, name, items, itemIndex, text } = await req.json();
+
+    // Auth is checked explicitly rather than relying on underCap's incidental
+    // 429: the text path skips the cap, and an unauthenticated request must
+    // never reach a paid API call.
+    const auth = req.headers.get("Authorization");
+    if (!auth) return json({ error: "unauthorized" }, 401);
+
+    const hasImage = typeof image === "string" && image !== "";
+    const hasText = typeof text === "string" && text.trim() !== "";
+    if (!hasImage && !hasText) {
+      return json({ error: "missing image or text" }, 400);
+    }
+    if (text !== undefined && text !== null && typeof text !== "string") {
+      return json({ error: "invalid text" }, 400);
     }
     // Absent is fine (first estimate). Present-but-not-a-string is a client
     // bug worth surfacing; over-length is truncated in normalizeName, since
@@ -116,10 +137,12 @@ Deno.serve(async (req) => {
     if (items !== undefined && !Array.isArray(items)) {
       return json({ error: "invalid items" }, 400);
     }
-    if (!(await underCap(req.headers.get("Authorization")))) {
+    // The cap counts saved photo meals and exists to bound image spend. Text
+    // estimates cost no image tokens and are deliberately uncapped.
+    if (hasImage && !(await underCap(auth))) {
       return json({ error: "daily photo limit reached" }, 429);
     }
-    return await estimate(image, name, items, itemIndex);
+    return await estimate({ image, name, items, itemIndex, text });
   } catch {
     return json({ error: "bad request" }, 400);
   }
