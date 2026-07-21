@@ -1,7 +1,7 @@
 # Manual meal item breakdowns and text-only calorie estimation
 
 **Date:** 2026-07-20
-**Status:** approved, not yet implemented
+**Status:** implemented 2026-07-21
 **Depends on:** `2026-07-20-per-item-meal-breakdown-design.md` — this spec
 consumes the `MealItemsEditor` component, the `meals.items` column, the
 `reasoning` schema field, and the density table that spec introduces. It cannot
