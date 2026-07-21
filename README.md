@@ -30,7 +30,7 @@ target based on my typical burn for that day of the week.
 2. **Gemini API key** — create a free one at https://aistudio.google.com/apikey
    (no payment card needed; free tier easily covers three tips a day).
 3. **Supabase** — create a free project and the `daily_metrics` table (see
-   `plan.md` for the schema). You'll need the project URL and a secret
+   `docs/plan.md` for the schema). You'll need the project URL and a secret
    (service-role-equivalent) key.
 4. **Garmin auth** — run `.venv/bin/python -m src.setup_auth` in Terminal
    (interactive: password + emailed code). Tokens last about a year; it
@@ -66,5 +66,5 @@ Garmin login troubleshooting lives in `.claude/skills/fetch-garmin/SKILL.md`.
 ## Calorie tracker PWA
 
 A React PWA (`pwa/`) for the dashboard, weight logging, and meal logging
-(manual or photo-estimated) — see `plan.md` for the architecture and
+(manual or photo-estimated) — see `docs/plan.md` for the architecture and
 `docs/superpowers/specs/` for the design docs.
