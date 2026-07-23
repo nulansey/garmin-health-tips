@@ -63,6 +63,21 @@ notification; a failed **Fetch Garmin data** run does not (it just shows red
 in the Actions tab — check there if tips stop updating with fresh data).
 Garmin login troubleshooting lives in `.claude/skills/fetch-garmin/SKILL.md`.
 
+## Pinned dependencies and model
+
+The workflows do a fresh `pip install` on every run, so everything is pinned
+to avoid the pipeline changing under us:
+
+- **`requirements.txt`** pins every dependency to an exact version. Bump them
+  deliberately, not by accident — an unpinned upgrade once broke tips silently.
+- **The Gemini model** is pinned in `src/analyze.py` (`MODEL`), currently
+  `gemini-3.5-flash`. Never use a `-latest` alias here: on 2026-07-21 the
+  `gemini-flash-latest` alias moved from a 2.5 to a 3.x model, which swapped
+  `thinking_budget` for `thinking_level` and 400'd every tip. If you bump the
+  model to a different major version, change the `thinking_config` in
+  `generate_tip` to match (2.x uses `thinking_budget`, 3.x uses
+  `thinking_level`). `gemini-3.5-flash` itself retires ~2026-10-16.
+
 ## Calorie tracker PWA
 
 A React PWA (`pwa/`) for the dashboard, weight logging, and meal logging
