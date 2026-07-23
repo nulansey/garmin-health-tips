@@ -7,7 +7,7 @@ import CaloriesChart from "../components/CaloriesChart.jsx";
 import SleepChart from "../components/SleepChart.jsx";
 import RestingHrChart from "../components/RestingHrChart.jsx";
 import PhotoMealForm from "../components/PhotoMealForm.jsx";
-import { intakeDate } from "../lib/intakeDate.js";
+import { intakeDate, calendarDate } from "../lib/intakeDate.js";
 import { dayIntake, sevenDayBalance, deficitState } from "../lib/balance.js";
 import { calibrationFactor } from "../lib/calibration.js";
 import { isLowLog } from "../lib/lowLog.js";
@@ -124,6 +124,9 @@ export default function Dashboard() {
 
   const today = days[0]; // newest first
   const todayBucket = intakeDate();
+  // The newest row is still accumulating when it is today's calendar day - the
+  // watch only uploads through the day, so burn/steps climb as it syncs.
+  const inProgress = today.date === calendarDate();
   const burnToday = today.total_kcal; // may be null - Garmin hasn't synced yet
   const inToday = meals ? dayIntake(meals, todayBucket) : null;
   const balanceToday = burnToday == null || inToday == null ? null : burnToday - inToday;
@@ -139,7 +142,10 @@ export default function Dashboard() {
 
   const tiles = [
     ["Calories in", meals === null ? "—" : inToday],
-    ["Calories out", burnToday ?? "—"],
+    ["Calories out", burnToday == null ? "—"
+      : inProgress
+        ? <span>{burnToday} <span style={{ ...textMuted, fontSize: 13 }}>so far</span></span>
+        : burnToday],
     ["Steps", today.steps ?? "—"],
     ["Resting HR", trendText(metricTrend(days, "resting_hr"), today.resting_hr)],
     ["Avg stress", trendText(metricTrend(days, "avg_stress"), today.avg_stress)],
@@ -161,7 +167,7 @@ export default function Dashboard() {
     <section>
       <div style={{ ...card, ...(state ? badge[state] : {}), padding: 20, marginBottom: 20 }}>
         <div style={{ ...textSecondary, fontSize: 14 }}>
-          Today's balance{lowLog ? " — low log, not reliable" : ""}
+          Today's balance{inProgress ? " — in progress" : ""}{lowLog ? " — low log, not reliable" : ""}
         </div>
         <div style={{ fontSize: 48, fontWeight: "var(--font-weight-emphasis)", lineHeight: 1.1 }}>
           {balanceToday == null ? "—" : balanceToday}
