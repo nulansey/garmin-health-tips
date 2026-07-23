@@ -1,7 +1,7 @@
-garminconnect>=0.3.6
-curl_cffi
+garminconnect==0.3.6
+curl_cffi==0.15.0
 google-genai==2.14.0
-requests
-PyYAML
-supabase
-pytest
+requests==2.34.2
+PyYAML==6.0.3
+supabase==2.31.0
+pytest==9.1.1
