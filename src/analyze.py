@@ -4,13 +4,12 @@ import json
 from google import genai
 from google.genai import types
 
-# Pinned, not the floating "-latest" alias: on 2026-07-21 that alias moved from
-# Gemini 2.5 to 3.x Flash, which swapped thinking_budget (token count) for
-# thinking_level (semantic) and 400'd every request below. Pin to 2.5 so
-# thinking_budget=0 stays valid.
-# ponytail: 2.5-flash retires ~2026-10-16. Before then, move to a 3.x flash
-# model AND change the thinking_config below to thinking_level, together.
-MODEL = "gemini-2.5-flash"
+# Pinned to a minor-version alias, never the floating "-latest": on 2026-07-21
+# "-latest" moved from 2.5 to 3.x Flash, which swapped thinking_budget (token
+# count) for thinking_level (semantic) and 400'd every request. 3.x uses
+# thinking_level (see generate_tip); a bump back to a 2.x model would need
+# thinking_budget instead.
+MODEL = "gemini-3.5-flash"
 
 SLOT_GUIDANCE = {
     "morning": (
@@ -78,10 +77,14 @@ def generate_tip(context, history, slot, config, calorie_target_value=None):
         model=MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
-            max_output_tokens=500,
-            # Disable "thinking" so the whole output budget goes to the tip, not
-            # to reasoning tokens (which otherwise can leave response.text empty).
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            # Thinking tokens share this budget, so give headroom above the
+            # ~150 tokens a 500-char tip needs; MINIMAL keeps reasoning small
+            # but not zero (3.x has no full-off like 2.x's thinking_budget=0),
+            # and too tight a cap leaves response.text empty.
+            max_output_tokens=800,
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.MINIMAL,
+            ),
         ),
     )
     text = (response.text or "").strip()
